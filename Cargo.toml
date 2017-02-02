@@ -1,0 +1,8 @@
+[package]
+name = "jig-20-interface-http"
+version = "0.1.0"
+authors = ["Sean Cross <sean@xobs.io>"]
+
+[dependencies]
+iron = "0.5.1"
+router = "0.5.1"
