@@ -4,6 +4,7 @@ extern crate router;
 use iron::prelude::*;
 use iron::status;
 use router::Router;
+const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -24,13 +25,13 @@ pub struct InterfaceState {
 fn cfti_send(msg: OutgoingMessage) {
     let tx = io::stdout();
     match msg {
-        OutgoingMessage::Hello(s) => {writeln!(tx.lock(), "HELLO {}", s);},
+        OutgoingMessage::Hello(s) => {writeln!(tx.lock(), "HELLO {}", s).unwrap();},
 //        _ => println!("Unrecognized message"),
     }
 }
 
 fn show_index(request: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
-    let mut state = state.lock().unwrap();
+    let state = state.lock().unwrap();
 
     Ok(Response::with((status::Ok, format!("Hello, world!  Jig is: {}", state.jig).to_string())))
 }
@@ -44,13 +45,13 @@ fn exit_server(request: &mut Request) -> IronResult<Response> {
 }
 
 fn send_hello(request: &mut Request) -> IronResult<Response> {
-    cfti_send(OutgoingMessage::Hello("hi there".to_string()));
+    cfti_send(OutgoingMessage::Hello(SERVER_SIGNATURE.to_string()));
 
     Ok(Response::with((status::Ok, "Sending HELLO".to_string())))
 }
 
 fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
-    let mut rx = io::stdin();
+    let rx = io::stdin();
     loop {
         let mut line = String::new();
         rx.read_line(&mut line).ok().expect("Unable to read line");
@@ -68,8 +69,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
 
 fn main() {
     let mut router = Router::new();
-    let jigs: Vec<String> = vec![];
-    let mut state = Arc::new(Mutex::new(InterfaceState {
+    let state = Arc::new(Mutex::new(InterfaceState {
         jig: "".to_string(),
         scenarios: vec![],
         tests: vec![],
