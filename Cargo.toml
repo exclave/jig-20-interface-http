@@ -6,3 +6,6 @@ authors = ["Sean Cross <sean@xobs.io>"]
 [dependencies]
 iron = "0.5.1"
 router = "0.5.1"
+serde = "0.9"
+serde_derive = "0.9"
+serde_json = "0.9"

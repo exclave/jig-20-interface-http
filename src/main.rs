@@ -1,8 +1,12 @@
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 extern crate iron;
 extern crate router;
 
 use iron::prelude::*;
 use iron::status;
+use iron::mime::Mime;
 use router::Router;
 const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
@@ -23,7 +27,7 @@ enum OutgoingMessage {
     Log(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct InterfaceState {
 
     /// The identifier of the server (returned on the HELLO line).
@@ -77,13 +81,27 @@ fn cfti_send(msg: OutgoingMessage) {
     }
 }
 
-fn show_index(request: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
-    let ref state = *state.lock().unwrap();
+use std::fs::File;
+use std::io::Read;
 
-    Ok(Response::with((status::Ok, format!("Hello, world!\nState is: {:?}", state).to_string())))
+fn show_index(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
+    let ref state = *state.lock().unwrap();
+    let mut index_file = File::open("index.html").unwrap();
+    let mut index = String::new();
+    index_file.read_to_string(&mut index).unwrap();
+
+    let content_type = "text/html".parse::<Mime>().unwrap();
+    Ok(Response::with((content_type, status::Ok, index)))
 }
 
-fn exit_server(request: &mut Request) -> IronResult<Response> {
+fn show_status_json(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
+    let ref state = *state.lock().unwrap();
+
+    let content_type = "application/json".parse::<Mime>().unwrap();
+    Ok(Response::with((content_type, status::Ok, serde_json::to_string(state).unwrap())))
+}
+
+fn exit_server(_: &mut Request) -> IronResult<Response> {
     thread::spawn(|| {
         thread::sleep(time::Duration::from_millis(5));
         std::process::exit(0);
@@ -91,13 +109,13 @@ fn exit_server(request: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, "Server is shutting down".to_string())))
 }
 
-fn send_hello(request: &mut Request) -> IronResult<Response> {
+fn send_hello(_: &mut Request) -> IronResult<Response> {
     cfti_send(OutgoingMessage::Hello(SERVER_SIGNATURE.to_string()));
 
     Ok(Response::with((status::Ok, "Sending HELLO".to_string())))
 }
 
-fn send_scenarios(request: &mut Request) -> IronResult<Response> {
+fn send_scenarios(_: &mut Request) -> IronResult<Response> {
     cfti_send(OutgoingMessage::Scenarios);
 
     Ok(Response::with((status::Ok, "Sending SCENARIOS".to_string())))
@@ -177,6 +195,10 @@ fn main() {
 
     let tmp = state.clone();
     router.get("/", move |request: &mut Request| show_index(request, &tmp), "index");
+
+    let tmp = state.clone();
+    router.get("/current.json", move |request: &mut Request| show_status_json(request, &tmp), "status");
+
     router.get("/exit", exit_server, "exit");
     router.get("/hello", send_hello, "hello");
     router.get("/scenarios", send_scenarios, "scenarios");
