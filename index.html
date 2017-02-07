@@ -10,8 +10,6 @@
 <body>
     <script>
         function updateStuff(result) {
-            $("#logs").html(result);
-
             $("#serverid").html(result.server);
 
             $("#jigid").html(result.jig);
@@ -21,6 +19,21 @@
             $("#scenarioid").html(result.scenario);
             $("#scenarioname").html(result.scenario_name);
             $("#scenariodescription").html(result.scenario_description);
+
+            $("#logs").find('tbody').empty();
+            result.log.forEach(function(e) {
+                d = new Date(0);
+                d.setUTCSeconds(e.timestamp.secs);
+                d.setMilliseconds(e.timestamp.nanos / 1000000);
+                $("#logs").find('tbody')
+                    .append($('<tr>')
+                        .append($('<td>').text(e.message_type))
+                        .append($('<td>').text(e.unit_type))
+                        .append($('<td>').text(e.unit_id))
+                        .append($('<td>').text(d))
+                        .append($('<td>').text(e.message))
+                    );
+            });
 
             queueUpdate(500);
         }
@@ -51,6 +64,19 @@
         <div>Test name: <span id="testname"></span></div>
         <div>Test description: <span id="testdescription"></span></div>
     </section>
-    <div id="logs"></div>
+    <table id="logs">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Unit Type</th>
+                <th>Unit ID</th>
+                <th>Timestamp</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr></tr>
+        </tbody>
+    </table>
 </body>
 </html>
