@@ -10,10 +10,18 @@ use iron::mime::Mime;
 use router::Router;
 const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use std::collections::HashMap;
+use std::fs::File;
+
+macro_rules! println_stderr(
+    ($($arg:tt)*) => { {
+        let r = writeln!(&mut ::std::io::stderr(), $($arg)*);
+        r.expect("failed printing to stderr");
+    } }
+);
 
 #[derive(Clone, Debug)]
 enum OutgoingMessage {
@@ -26,6 +34,16 @@ enum OutgoingMessage {
     Abort,
     Log(String),
     Shutdown(String),
+}
+
+// <message-type>   <unit>    <unit-type>    <unix-time-secs>    <unix-time-nsecs>    <message>
+#[derive(Clone, Debug, Serialize)]
+struct LogMessage {
+    message_type: u32,
+    unit_id: String,
+    unit_type: String,
+    timestamp: time::Duration,
+    message: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -62,7 +80,7 @@ pub struct InterfaceState {
     test_descriptions: HashMap<String, String>,
 
     /// List of log entries, returned by LOG
-    log: Vec<String>,
+    log: Vec<LogMessage>,
 }
 
 fn cfti_send(msg: OutgoingMessage) {
@@ -82,9 +100,6 @@ fn cfti_send(msg: OutgoingMessage) {
         println!("Unable to write outgoing message: {}", result.unwrap_err());
     }
 }
-
-use std::fs::File;
-use std::io::Read;
 
 fn show_index(_: &mut Request, _: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
     let mut index_file = File::open("index.html").unwrap();
@@ -140,19 +155,19 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
         "test" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().test_names.insert(name, value).unwrap();},
             "description" => {data_arc.lock().unwrap().test_descriptions.insert(name, value).unwrap();},
-            f => println!("Unrecognized field: {}", f),
+            f => println_stderr!("Unrecognized field: {}", f),
         },
         "scenario" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().scenario_names.insert(name, value).unwrap();},
             "description" => {data_arc.lock().unwrap().scenario_descriptions.insert(name, value).unwrap();},
-            f => println!("Unrecognized field: {}", f),
+            f => println_stderr!("Unrecognized field: {}", f),
         },
         "jig" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().jig_name = format!("{} {}", name_uc, value);},
             "description" => {data_arc.lock().unwrap().jig_description = format!("{} {}", name_uc, value);},
-            f => println!("Unrecognized field: {}", f),
+            f => println_stderr!("Unrecognized field: {}", f),
         },
-        c => println!("Unrecognized class: {}", c),
+        c => println_stderr!("Unrecognized class: {}", c),
     };
 }
 
@@ -162,7 +177,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
         let mut line = String::new();
         rx.read_line(&mut line).ok().expect("Unable to read line");
 
-        let mut items: Vec<String> = line.split_whitespace().map(|x| x.to_lowercase().to_string()).collect();
+        let mut items: Vec<String> = line.split_whitespace().map(|x| x.to_string()).collect();
         let verb = items[0].to_lowercase();
         items.remove(0);
 
@@ -172,9 +187,25 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
             "scenarios" => data_arc.lock().unwrap().scenarios = items.clone(),
             "tests" => data_arc.lock().unwrap().tests = items.clone(),
             "describe" => stdin_describe(&data_arc, items),
-            "log" => data_arc.lock().unwrap().log.push(items.join(" ")),
+            "log" => {
+                let message_type: u32 = items.remove(0).parse().unwrap();
+                let unit_id = items.remove(0);
+                let unit_type = items.remove(0);
+                let timestamp = time::Duration::new(items[0].parse().unwrap(),
+                                                    items[1].parse().unwrap());
+                items.remove(0);
+                items.remove(0);
+                let message = items.join(" ");
+                data_arc.lock().unwrap().log.push(LogMessage {
+                    message_type: message_type,
+                    unit_id: unit_id,
+                    unit_type: unit_type,
+                    timestamp: timestamp,
+                    message: message,
+                });
+            },
             "exit" => std::process::exit(0),
-            other => println!("Unrecognized command: {}", other),
+            other => println_stderr!("Unrecognized command: {}", other),
         }
         thread::sleep(time::Duration::from_millis(100));
     }
