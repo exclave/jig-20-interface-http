@@ -141,30 +141,29 @@ fn send_scenarios(_: &mut Request) -> IronResult<Response> {
 
 fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
     let mut rest = items.clone();
-    let class = items[0].to_lowercase();
-    let field = items[1].to_lowercase();
-    let name = items[2].to_lowercase();
-    let name_uc = items[2].clone();
+    let class = rest.remove(0).to_lowercase();
+    let field = rest.remove(0).to_lowercase();
+    let jig_value = rest.join(" ");
+    let name = rest.remove(0);
+    let name_lc = name.to_lowercase();
 
-    // Remove the first three items: Class, Type, and Name.
-    rest.remove(0);
-    rest.remove(0);
-    rest.remove(0);
     let value = rest.join(" ");
+
+
     match class.as_str() {
         "test" => match field.as_str() {
-            "name" => {data_arc.lock().unwrap().test_names.insert(name, value).unwrap();},
-            "description" => {data_arc.lock().unwrap().test_descriptions.insert(name, value).unwrap();},
+            "name" => {data_arc.lock().unwrap().test_names.insert(name_lc, value);},
+            "description" => {data_arc.lock().unwrap().test_descriptions.insert(name_lc, value);},
             f => println_stderr!("Unrecognized field: {}", f),
         },
         "scenario" => match field.as_str() {
-            "name" => {data_arc.lock().unwrap().scenario_names.insert(name, value).unwrap();},
-            "description" => {data_arc.lock().unwrap().scenario_descriptions.insert(name, value).unwrap();},
+            "name" => {data_arc.lock().unwrap().scenario_names.insert(name_lc, value);},
+            "description" => {data_arc.lock().unwrap().scenario_descriptions.insert(name_lc, value);},
             f => println_stderr!("Unrecognized field: {}", f),
         },
         "jig" => match field.as_str() {
-            "name" => {data_arc.lock().unwrap().jig_name = format!("{} {}", name_uc, value);},
-            "description" => {data_arc.lock().unwrap().jig_description = format!("{} {}", name_uc, value);},
+            "name" => {data_arc.lock().unwrap().jig_name = jig_value;},
+            "description" => {data_arc.lock().unwrap().jig_description = jig_value;},
             f => println_stderr!("Unrecognized field: {}", f),
         },
         c => println_stderr!("Unrecognized class: {}", c),
@@ -178,6 +177,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
         rx.read_line(&mut line).ok().expect("Unable to read line");
 
         let mut items: Vec<String> = line.split_whitespace().map(|x| x.to_string()).collect();
+        println_stderr!("Got command: {:?}", items);
         let verb = items[0].to_lowercase();
         items.remove(0);
 

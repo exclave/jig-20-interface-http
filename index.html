@@ -20,6 +20,11 @@
             $("#scenarioname").html(result.scenario_name);
             $("#scenariodescription").html(result.scenario_description);
 
+            $("#scenarios").empty();
+            result.scenarios.forEach(function(e) {
+                $("#scenarios").append($('<option>').text(e));
+            });
+
             $("#logs").find('tbody').empty();
             result.log.forEach(function(e) {
                 d = new Date(0);
@@ -63,6 +68,10 @@
         <div>Test: <span id="testid"></span></div>
         <div>Test name: <span id="testname"></span></div>
         <div>Test description: <span id="testdescription"></span></div>
+    </section>
+    <section id="scenariolist"><label for="scenarios">Available Scenarios</label>
+        <select name"scenarios" id="scenarios">
+        </select>
     </section>
     <table id="logs">
         <thead>
