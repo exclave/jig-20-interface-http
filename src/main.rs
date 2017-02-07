@@ -86,8 +86,7 @@ fn cfti_send(msg: OutgoingMessage) {
 use std::fs::File;
 use std::io::Read;
 
-fn show_index(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
-    let ref state = *state.lock().unwrap();
+fn show_index(_: &mut Request, _: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
     let mut index_file = File::open("index.html").unwrap();
     let mut index = String::new();
     index_file.read_to_string(&mut index).unwrap();
