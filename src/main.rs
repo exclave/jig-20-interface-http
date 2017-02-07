@@ -25,6 +25,7 @@ enum OutgoingMessage {
     Start,
     Abort,
     Log(String),
+    Shutdown(String),
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -75,6 +76,7 @@ fn cfti_send(msg: OutgoingMessage) {
         OutgoingMessage::Start => writeln!(tx.lock(), "START"),
         OutgoingMessage::Abort => writeln!(tx.lock(), "ABORT"),
         OutgoingMessage::Log(s) => writeln!(tx.lock(), "LOG {}", s),
+        OutgoingMessage::Shutdown(s) => writeln!(tx.lock(), "SHUTDOWN {}", s),
     };
     if result.is_err() {
         println!("Unable to write outgoing message: {}", result.unwrap_err());
@@ -102,6 +104,8 @@ fn show_status_json(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> Iron
 }
 
 fn exit_server(_: &mut Request) -> IronResult<Response> {
+    cfti_send(OutgoingMessage::Shutdown("User clicked Quit".to_string()));
+
     thread::spawn(|| {
         thread::sleep(time::Duration::from_millis(5));
         std::process::exit(0);
