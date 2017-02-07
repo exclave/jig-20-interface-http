@@ -196,6 +196,8 @@ fn main() {
         log: vec![],
     }));
 
+    cfti_send(OutgoingMessage::Log("HTTP interface starting up".to_string()));
+
     let tmp = state.clone();
     router.get("/", move |request: &mut Request| show_index(request, &tmp), "index");
 
