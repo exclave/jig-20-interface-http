@@ -49,6 +49,24 @@ struct LogMessage {
 }
 
 #[derive(Clone, Debug, Serialize)]
+enum TestResult {
+    /// The test has not yet been run.
+    Pending,
+
+    /// The test is currently being run.
+    Running,
+
+    /// The test passed.  "result" is the last string that it printed (if any).
+    Pass(String /*result*/),
+
+    /// The test failed.  "reason" is the last string it printed, or the reason it failed.
+    Fail(String /*reason*/),
+
+    /// The test was skipped, possibly due to an earlier dependency failure.
+    Skipped(String /*reason*/),
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct InterfaceState {
 
     /// The identifier of the server (returned on the HELLO line).
@@ -81,8 +99,11 @@ pub struct InterfaceState {
     /// Map of test names, returned by various DESCRIBE TEST NAME [x] [y]
     test_names: HashMap<String, String>,
 
-    /// Map of test descriptoins, returned by various DESCRIBE TEST DESCRIPTION [x] [y]
+    /// Map of test descriptions, returned by various DESCRIBE TEST DESCRIPTION [x] [y]
     test_descriptions: HashMap<String, String>,
+
+    /// Map of test results, usually will default to "Pending".
+    test_results: HashMap<String, TestResult>,
 
     /// List of log entries, returned by LOG
     log: Vec<LogMessage>,
@@ -219,17 +240,40 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
             "jig" => data_arc.lock().unwrap().jig = items[0].clone(),
             "scenarios" => data_arc.lock().unwrap().scenarios = items.clone(),
             "scenario" => data_arc.lock().unwrap().scenario = items[0].clone(),
-            "tests" => data_arc.lock().unwrap().tests = items.clone(),
+            "tests" => {
+                data_arc.lock().unwrap().tests = items.clone();
+
+                // We got a new set of tests, so reset all the test results to "Pending".
+                data_arc.lock().unwrap().test_results.clear();
+                for item in items {
+                    data_arc.lock().unwrap().test_results.insert(item, TestResult::Pending);
+                }
+            },
             "describe" => stdin_describe(&data_arc, items),
             "ping" => cfti_send(OutgoingMessage::Pong(items[0].clone())),
             /*
             "start" =>
-            "running" =>
-            "pass" =>
-            "fail" =>
-            "skip" =>
             "finish" =>
             */
+            "running" => {
+                let test_id = items.remove(0);
+                data_arc.lock().unwrap().test_results.insert(test_id, TestResult::Running);
+            },
+            "pass" => {
+                let test_id = items.remove(0);
+                let test_result = items.join(" ");
+                data_arc.lock().unwrap().test_results.insert(test_id, TestResult::Pass(test_result));
+            },
+            "fail" => {
+                let test_id = items.remove(0);
+                let test_result = items.join(" ");
+                data_arc.lock().unwrap().test_results.insert(test_id, TestResult::Fail(test_result));
+            },
+            "skip" => {
+                let test_id = items.remove(0);
+                let test_result = items.join(" ");
+                data_arc.lock().unwrap().test_results.insert(test_id, TestResult::Skipped(test_result));
+            },
             "log" => {
                 let message_type: u32 = items.remove(0).parse().unwrap();
                 let unit_id = items.remove(0);
@@ -270,6 +314,7 @@ fn main() {
         tests: vec![],
         test_names: HashMap::new(),
         test_descriptions: HashMap::new(),
+        test_results: HashMap::new(),
         log: vec![],
     }));
 
