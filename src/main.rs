@@ -262,6 +262,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 data_arc.lock().unwrap().scenario_state = ScenarioState::Pending;
             },
             "tests" => {
+                items.remove(0); // Remove the scenario name, which is the first result.
                 data_arc.lock().unwrap().tests = items.clone();
 
                 // We got a new set of tests, so reset all the test results to "Pending".

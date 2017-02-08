@@ -54,18 +54,23 @@
         }
         function changeScenario(e) {
             var new_scenario_id = $('#scenarioselect').val();
-            console.log("Changed scenario to " + new_scenario_id);
             $.ajax({url: "/scenario?" + new_scenario_id, success: function(){}});
             return true;
         }
 
         $(document).ready(function() {
             $('#scenarioselect').on("change", changeScenario);
+            $('#exit-button').on('click', function() {
+                $.ajax({
+                    url: "/exit",
+                    success: function(){}
+                });
+            });
             fireUpdate();
         })
     </script>
     <ol>
-        <li><a href="/exit">Quit Server</a></li>
+        <li><input type="submit" id="exit-button" value="Quit Server"></li>
     </ol>
     <div>Server ID: <span id="serverid"></span></div>
     <section id="jigsection">
