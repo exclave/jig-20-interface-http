@@ -49,6 +49,21 @@ struct LogMessage {
 }
 
 #[derive(Clone, Debug, Serialize)]
+enum ScenarioState {
+    /// The scenario has not yet been run
+    Pending,
+
+    /// Some tests are being run
+    Running,
+
+    /// All scenario tests passed
+    Pass,
+
+    /// One or more of the tests failed
+    Fail,
+}
+
+#[derive(Clone, Debug, Serialize)]
 enum TestResult {
     /// The test has not yet been run.
     Pending,
@@ -92,6 +107,9 @@ pub struct InterfaceState {
 
     /// ID of the currently-selected scenario
     scenario: String,
+
+    /// What state the current scenario is in
+    scenario_state: ScenarioState,
 
     /// List of tests in the current scenario, returned by TESTS [x]
     tests: Vec<String>,
@@ -239,7 +257,10 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
             "hello" => data_arc.lock().unwrap().server = items.join(" "),
             "jig" => data_arc.lock().unwrap().jig = items[0].clone(),
             "scenarios" => data_arc.lock().unwrap().scenarios = items.clone(),
-            "scenario" => data_arc.lock().unwrap().scenario = items[0].clone(),
+            "scenario" => {
+                data_arc.lock().unwrap().scenario = items[0].clone();
+                data_arc.lock().unwrap().scenario_state = ScenarioState::Pending;
+            },
             "tests" => {
                 data_arc.lock().unwrap().tests = items.clone();
 
@@ -251,10 +272,28 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
             },
             "describe" => stdin_describe(&data_arc, items),
             "ping" => cfti_send(OutgoingMessage::Pong(items[0].clone())),
-            /*
-            "start" =>
-            "finish" =>
-            */
+            "start" => {
+                data_arc.lock().unwrap().scenario_state = ScenarioState::Running;
+                let test_names = data_arc.lock().unwrap().tests.clone();
+
+                // We got a new set of tests, so reset all the test results to "Pending".
+                data_arc.lock().unwrap().test_results.clear();
+                for test_name in test_names {
+                    data_arc.lock().unwrap().test_results.insert(test_name, TestResult::Pending);
+                }
+            },
+            "finish" => {
+                let result = match items.remove(0).parse() {
+                    Ok(val) => val,
+                    Err(e) => {println_stderr!("Unable to parse result: {:?}", e); 500},
+                };
+
+                data_arc.lock().unwrap().scenario_state = match result {
+                    // Only results of 200 to 299 are considered "pass"
+                    200 ... 299 => ScenarioState::Pass,
+                    _ => ScenarioState::Fail,
+                };
+            }
             "running" => {
                 let test_id = items.remove(0);
                 data_arc.lock().unwrap().test_results.insert(test_id, TestResult::Running);
@@ -311,6 +350,7 @@ fn main() {
         scenario_names: HashMap::new(),
         scenario_descriptions: HashMap::new(),
         scenario: "".to_string(),
+        scenario_state: ScenarioState::Pending,
         tests: vec![],
         test_names: HashMap::new(),
         test_descriptions: HashMap::new(),
