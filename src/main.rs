@@ -35,6 +35,7 @@ enum OutgoingMessage {
     AbortTests,
     Log(String),
     Shutdown(String),
+    Pong(String),
 }
 
 // <message-type>   <unit>    <unit-type>    <unix-time-secs>    <unix-time-nsecs>    <message>
@@ -71,6 +72,9 @@ pub struct InterfaceState {
     /// Map of scenario descriptions, returned by DESCRIBE SCENARIO DESCRIPTION [x] [y]
     scenario_descriptions: HashMap<String, String>,
 
+    /// ID of the currently-selected scenario
+    scenario: String,
+
     /// List of tests in the current scenario, returned by TESTS [x]
     tests: Vec<String>,
 
@@ -95,6 +99,7 @@ fn cfti_send(msg: OutgoingMessage) {
         OutgoingMessage::StartTests => writeln!(tx.lock(), "START"),
         OutgoingMessage::AbortTests => writeln!(tx.lock(), "ABORT"),
         OutgoingMessage::Log(s) => writeln!(tx.lock(), "LOG {}", s),
+        OutgoingMessage::Pong(s) => writeln!(tx.lock(), "PONG {}", s),
         OutgoingMessage::Shutdown(s) => writeln!(tx.lock(), "SHUTDOWN {}", s),
     };
     if result.is_err() {
@@ -213,8 +218,18 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
             "hello" => data_arc.lock().unwrap().server = items.join(" "),
             "jig" => data_arc.lock().unwrap().jig = items[0].clone(),
             "scenarios" => data_arc.lock().unwrap().scenarios = items.clone(),
+            "scenario" => data_arc.lock().unwrap().scenario = items[0].clone(),
             "tests" => data_arc.lock().unwrap().tests = items.clone(),
             "describe" => stdin_describe(&data_arc, items),
+            "ping" => cfti_send(OutgoingMessage::Pong(items[0].clone())),
+            /*
+            "start" =>
+            "running" =>
+            "pass" =>
+            "fail" =>
+            "skip" =>
+            "finish" =>
+            */
             "log" => {
                 let message_type: u32 = items.remove(0).parse().unwrap();
                 let unit_id = items.remove(0);
@@ -251,6 +266,7 @@ fn main() {
         scenarios: vec![],
         scenario_names: HashMap::new(),
         scenario_descriptions: HashMap::new(),
+        scenario: "".to_string(),
         tests: vec![],
         test_names: HashMap::new(),
         test_descriptions: HashMap::new(),
