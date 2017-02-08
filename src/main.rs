@@ -12,11 +12,10 @@ use mount::Mount;
 use staticfile::Static;
 const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use std::collections::HashMap;
-use std::fs::File;
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => { {
@@ -28,12 +27,12 @@ macro_rules! println_stderr(
 #[derive(Clone, Debug)]
 enum OutgoingMessage {
     Hello(String),
-    Jig,
+    GetJig,
     Scenarios,
     Scenario(String),
-    Tests,
-    Start,
-    Abort,
+    GetTests,
+    StartTests,
+    AbortTests,
     Log(String),
     Shutdown(String),
 }
@@ -89,12 +88,12 @@ fn cfti_send(msg: OutgoingMessage) {
     let tx = io::stdout();
     let result = match msg {
         OutgoingMessage::Hello(s) => writeln!(tx.lock(), "HELLO {}", s),
-        OutgoingMessage::Jig => writeln!(tx.lock(), "JIG"),
+        OutgoingMessage::GetJig => writeln!(tx.lock(), "JIG"),
         OutgoingMessage::Scenarios => writeln!(tx.lock(), "SCENARIOS"),
         OutgoingMessage::Scenario(s) => writeln!(tx.lock(), "SCENARIO {}", s),
-        OutgoingMessage::Tests => writeln!(tx.lock(), "TESTS"),
-        OutgoingMessage::Start => writeln!(tx.lock(), "START"),
-        OutgoingMessage::Abort => writeln!(tx.lock(), "ABORT"),
+        OutgoingMessage::GetTests => writeln!(tx.lock(), "TESTS"),
+        OutgoingMessage::StartTests => writeln!(tx.lock(), "START"),
+        OutgoingMessage::AbortTests => writeln!(tx.lock(), "ABORT"),
         OutgoingMessage::Log(s) => writeln!(tx.lock(), "LOG {}", s),
         OutgoingMessage::Shutdown(s) => writeln!(tx.lock(), "SHUTDOWN {}", s),
     };
@@ -130,6 +129,42 @@ fn send_scenarios(_: &mut Request) -> IronResult<Response> {
     cfti_send(OutgoingMessage::Scenarios);
 
     Ok(Response::with((status::Ok, "Sending SCENARIOS".to_string())))
+}
+
+fn select_scenario(request: &mut Request) -> IronResult<Response> {
+
+    println_stderr!("Request URL: {:?}", request.url.query());
+    let scenario_id = match request.url.query() {
+        None => return Ok(Response::with((status::BadRequest, "scenario request needs a scenario id.  Access /scenario?id".to_string()))),
+        Some(s) => s.to_string(),
+    };
+
+    cfti_send(OutgoingMessage::Scenario(scenario_id.clone()));
+    Ok(Response::with((status::Ok, format!("Selecting scenario {}", scenario_id).to_string())))
+}
+
+fn get_jig(_: &mut Request) -> IronResult<Response> {
+    cfti_send(OutgoingMessage::GetJig);
+
+    Ok(Response::with((status::Ok, "Requesting jig id".to_string())))
+}
+
+fn get_tests(_: &mut Request) -> IronResult<Response> {
+    cfti_send(OutgoingMessage::GetTests);
+
+    Ok(Response::with((status::Ok, "Requesting test list".to_string())))
+}
+
+fn start_tests(_: &mut Request) -> IronResult<Response> {
+    cfti_send(OutgoingMessage::StartTests);
+
+    Ok(Response::with((status::Ok, "Starting tests".to_string())))
+}
+
+fn abort_tests(_: &mut Request) -> IronResult<Response> {
+    cfti_send(OutgoingMessage::AbortTests);
+
+    Ok(Response::with((status::Ok, "Aborting tests".to_string())))
 }
 
 fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
@@ -232,6 +267,11 @@ fn main() {
     mnt.mount("/exit", exit_server);
     mnt.mount("/hello", send_hello);
     mnt.mount("/scenarios", send_scenarios);
+    mnt.mount("/scenario", select_scenario);
+    mnt.mount("/jig", get_jig);
+    mnt.mount("/tests", get_tests);
+    mnt.mount("/start", start_tests);
+    mnt.mount("/abort", abort_tests);
 
     thread::spawn(move || stdin_monitor(state.clone()));
     Iron::new(mnt).http("localhost:3000").unwrap();
