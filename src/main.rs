@@ -2,12 +2,14 @@
 extern crate serde_derive;
 extern crate serde_json;
 extern crate iron;
-extern crate router;
+extern crate staticfile;
+extern crate mount;
 
 use iron::prelude::*;
 use iron::status;
 use iron::mime::Mime;
-use router::Router;
+use mount::Mount;
+use staticfile::Static;
 const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
 use std::io::{self, Read, Write};
@@ -99,15 +101,6 @@ fn cfti_send(msg: OutgoingMessage) {
     if result.is_err() {
         println!("Unable to write outgoing message: {}", result.unwrap_err());
     }
-}
-
-fn show_index(_: &mut Request, _: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
-    let mut index_file = File::open("index.html").unwrap();
-    let mut index = String::new();
-    index_file.read_to_string(&mut index).unwrap();
-
-    let content_type = "text/html".parse::<Mime>().unwrap();
-    Ok(Response::with((content_type, status::Ok, index)))
 }
 
 fn show_status_json(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
@@ -212,7 +205,9 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
 }
 
 fn main() {
-    let mut router = Router::new();
+    let mut mnt = Mount::new();
+    let staticfile = Static::new("html");
+
     let state = Arc::new(Mutex::new(InterfaceState {
         server: "".to_string(),
         jig: "".to_string(),
@@ -229,17 +224,15 @@ fn main() {
 
     cfti_send(OutgoingMessage::Log("HTTP interface starting up".to_string()));
 
-    let tmp = state.clone();
-    router.get("/", move |request: &mut Request| show_index(request, &tmp), "index");
+    mnt.mount("/", staticfile);
 
     let tmp = state.clone();
-    router.get("/current.json", move |request: &mut Request| show_status_json(request, &tmp), "status");
+    mnt.mount("/current.json", move |request: &mut Request| show_status_json(request, &tmp));
 
-    router.get("/exit", exit_server, "exit");
-    router.get("/hello", send_hello, "hello");
-    router.get("/scenarios", send_scenarios, "scenarios");
-    //router.get("/jig", send_jig, "send_jigs");
+    mnt.mount("/exit", exit_server);
+    mnt.mount("/hello", send_hello);
+    mnt.mount("/scenarios", send_scenarios);
 
     thread::spawn(move || stdin_monitor(state.clone()));
-    Iron::new(router).http("localhost:3000").unwrap();
+    Iron::new(mnt).http("localhost:3000").unwrap();
 }
