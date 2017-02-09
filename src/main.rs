@@ -111,8 +111,8 @@ pub struct InterfaceState {
     /// What state the current scenario is in
     scenario_state: ScenarioState,
 
-    /// List of tests in the current scenario, returned by TESTS [x]
-    tests: Vec<String>,
+    /// List of tests in each scenario, returned by TESTS [x]
+    tests: HashMap<String, Vec<String>>,
 
     /// Map of test names, returned by various DESCRIBE TEST NAME [x] [y]
     test_names: HashMap<String, String>,
@@ -262,8 +262,8 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 data_arc.lock().unwrap().scenario_state = ScenarioState::Pending;
             },
             "tests" => {
-                items.remove(0); // Remove the scenario name, which is the first result.
-                data_arc.lock().unwrap().tests = items.clone();
+                let scenario_name = items.remove(0); // Remove the scenario name, which is the first result.
+                data_arc.lock().unwrap().tests.insert(scenario_name, items.clone());
 
                 // We got a new set of tests, so reset all the test results to "Pending".
                 data_arc.lock().unwrap().test_results.clear();
@@ -274,8 +274,9 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
             "describe" => stdin_describe(&data_arc, items),
             "ping" => cfti_send(OutgoingMessage::Pong(items[0].clone())),
             "start" => {
+                let scenario_name = items.remove(0);
                 data_arc.lock().unwrap().scenario_state = ScenarioState::Running;
-                let test_names = data_arc.lock().unwrap().tests.clone();
+                let test_names = data_arc.lock().unwrap().tests[&scenario_name].clone();
 
                 // We got a new set of tests, so reset all the test results to "Pending".
                 data_arc.lock().unwrap().test_results.clear();
@@ -352,7 +353,7 @@ fn main() {
         scenario_descriptions: HashMap::new(),
         scenario: "".to_string(),
         scenario_state: ScenarioState::Pending,
-        tests: vec![],
+        tests: HashMap::new(),
         test_names: HashMap::new(),
         test_descriptions: HashMap::new(),
         test_results: HashMap::new(),

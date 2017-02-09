@@ -20,13 +20,23 @@
             $("#scenarioname").html(result.scenario_names[result.scenario]);
             $("#scenariodescription").html(result.scenario_descriptions[result.scenario]);
 
-            var selected_id = $('#scenarioselect').val() || result.scenario;
+            var scenario_id = $('#scenarioselect').val() || result.scenario;
             $("#scenarioselect").empty();
             result.scenarios.forEach(function(e) {
                 $("#scenarioselect").append($('<option>', {
                     value: e,
-                    selected: e == selected_id
+                    selected: e === scenario_id
                 }).text(result.scenario_names[e]));
+            });
+
+            $('#tests').find('tbody').empty();
+            result.tests[scenario_id].forEach(function(e) {
+                $('#tests').find('tbody')
+                    .append($('<tr>')
+                        .append($('<td>').text(e))
+                        .append($('<td>').text(result.test_names[e]))
+                        .append($('<td>').text(result.test_descriptions[e]))
+                );
             });
 
             $("#logs").find('tbody').empty();
@@ -43,13 +53,12 @@
                         .append($('<td>').text(e.message))
                     );
             });
-
-            queueUpdate(500);
         }
         function queueUpdate(timeout) {
             window.setTimeout(function() { fireUpdate(); }, timeout);
         }
         function fireUpdate() {
+            queueUpdate(500);
             $.ajax({url: "/current.json", success: updateStuff});
         }
         function changeScenario(e) {
@@ -92,6 +101,19 @@
         <select name="scenarioselect" id="scenarioselect" size="5">
         </select>
     </section>
+    <table id="tests">
+        <thead>
+            <tr>
+                <th>Test ID</th>
+                <th>Name</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+            </tr>
+        </tbody>
+    </table>
     <table id="logs">
         <thead>
             <tr>
