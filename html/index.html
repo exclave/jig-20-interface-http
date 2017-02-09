@@ -19,6 +19,7 @@
             $("#scenarioid").html(result.scenario);
             $("#scenarioname").html(result.scenario_names[result.scenario]);
             $("#scenariodescription").html(result.scenario_descriptions[result.scenario]);
+            $("#scenariostate").html(result.scenario_state);
 
             var scenario_id = $('#scenarioselect').val() || result.scenario;
             $("#scenarioselect").empty();
@@ -30,14 +31,17 @@
             });
 
             $('#tests').find('tbody').empty();
-            result.tests[scenario_id].forEach(function(e) {
-                $('#tests').find('tbody')
-                    .append($('<tr>')
-                        .append($('<td>').text(e))
-                        .append($('<td>').text(result.test_names[e]))
-                        .append($('<td>').text(result.test_descriptions[e]))
-                );
-            });
+            if (result.tests[scenario_id] !== undefined) {
+                result.tests[scenario_id].forEach(function(e) {
+                    $('#tests').find('tbody')
+                        .append($('<tr>')
+                            .append($('<td>').text(e))
+                            .append($('<td>').text(result.test_names[e]))
+                            .append($('<td>').text(result.test_descriptions[e]))
+                            .append($('<td>').text(result.test_results[e]))
+                    );
+                });
+            }
 
             $("#logs").find('tbody').empty();
             result.log.forEach(function(e) {
@@ -75,12 +79,16 @@
                     success: function(){}
                 });
             });
+            $('#startstop-button').on('click', function() {
+                $.ajax({
+                    url: "/start",
+                    success: function(){}
+                });
+            });
             fireUpdate();
         })
     </script>
-    <ol>
-        <li><input type="submit" id="exit-button" value="Quit Server"></li>
-    </ol>
+    <div><input type="submit" id="exit-button" value="Quit Server"></div>
     <div>Server ID: <span id="serverid"></span></div>
     <section id="jigsection">
         <div>Jig: <span id="jigid"></span></div>
@@ -91,11 +99,7 @@
         <div>Scenario: <span id="scenarioid"></span></div>
         <div>Scenario name: <span id="scenarioname"></span></div>
         <div>Scenario description: <span id="scenariodescription"></span></div>
-    </section>
-    <section id="testsection">
-        <div>Test: <span id="testid"></span></div>
-        <div>Test name: <span id="testname"></span></div>
-        <div>Test description: <span id="testdescription"></span></div>
+        <div>Scenario state: <span id="scenariostate"></span></div>
     </section>
     <section id="scenariolist"><label for="scenarioselect">Available Scenarios</label>
         <select name="scenarioselect" id="scenarioselect" size="5">
@@ -107,6 +111,7 @@
                 <th>Test ID</th>
                 <th>Name</th>
                 <th>Description</th>
+                <th>Result</th>
             </tr>
         </thead>
         <tbody>
@@ -114,6 +119,7 @@
             </tr>
         </tbody>
     </table>
+    <div><input type="submit" id="startstop-button" value="Start Tests"></div>
     <table id="logs">
         <thead>
             <tr>

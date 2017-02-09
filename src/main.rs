@@ -219,10 +219,8 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
     let mut rest = items.clone();
     let class = rest.remove(0).to_lowercase();
     let field = rest.remove(0).to_lowercase();
-    let jig_value = rest.join(" ");
     let name = rest.remove(0);
     let name_lc = name.to_lowercase();
-
     let value = rest.join(" ");
 
 
@@ -238,8 +236,8 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
             f => println_stderr!("Unrecognized field: {}", f),
         },
         "jig" => match field.as_str() {
-            "name" => {data_arc.lock().unwrap().jig_name = jig_value;},
-            "description" => {data_arc.lock().unwrap().jig_description = jig_value;},
+            "name" => {data_arc.lock().unwrap().jig_name = value;},
+            "description" => {data_arc.lock().unwrap().jig_description = value;},
             f => println_stderr!("Unrecognized field: {}", f),
         },
         c => println_stderr!("Unrecognized class: {}", c),
