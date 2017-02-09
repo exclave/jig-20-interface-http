@@ -31,7 +31,7 @@ enum OutgoingMessage {
     Scenarios,
     Scenario(String),
     GetTests,
-    StartTests,
+    StartTests(String),
     AbortTests,
     Log(String),
     Shutdown(String),
@@ -135,7 +135,7 @@ fn cfti_send(msg: OutgoingMessage) {
         OutgoingMessage::Scenarios => writeln!(tx.lock(), "SCENARIOS"),
         OutgoingMessage::Scenario(s) => writeln!(tx.lock(), "SCENARIO {}", s),
         OutgoingMessage::GetTests => writeln!(tx.lock(), "TESTS"),
-        OutgoingMessage::StartTests => writeln!(tx.lock(), "START"),
+        OutgoingMessage::StartTests(s) => writeln!(tx.lock(), "START {}", s),
         OutgoingMessage::AbortTests => writeln!(tx.lock(), "ABORT"),
         OutgoingMessage::Log(s) => writeln!(tx.lock(), "LOG {}", s),
         OutgoingMessage::Pong(s) => writeln!(tx.lock(), "PONG {}", s),
@@ -177,7 +177,6 @@ fn send_scenarios(_: &mut Request) -> IronResult<Response> {
 
 fn select_scenario(request: &mut Request) -> IronResult<Response> {
 
-    println_stderr!("Request URL: {:?}", request.url.query());
     let scenario_id = match request.url.query() {
         None => return Ok(Response::with((status::BadRequest, "scenario request needs a scenario id.  Access /scenario?id".to_string()))),
         Some(s) => s.to_string(),
@@ -199,10 +198,15 @@ fn get_tests(_: &mut Request) -> IronResult<Response> {
     Ok(Response::with((status::Ok, "Requesting test list".to_string())))
 }
 
-fn start_tests(_: &mut Request) -> IronResult<Response> {
-    cfti_send(OutgoingMessage::StartTests);
+fn start_tests(request: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
+    let scenario_id = match request.url.query() {
+        None => state.lock().unwrap().scenario.clone(),
+        Some(s) => s.to_string(),
+    };
 
-    Ok(Response::with((status::Ok, "Starting tests".to_string())))
+    cfti_send(OutgoingMessage::StartTests(scenario_id.clone()));
+
+    Ok(Response::with((status::Ok, format!("Starting {} scenario", scenario_id))))
 }
 
 fn abort_tests(_: &mut Request) -> IronResult<Response> {
@@ -367,13 +371,15 @@ fn main() {
     let tmp = state.clone();
     mnt.mount("/current.json", move |request: &mut Request| show_status_json(request, &tmp));
 
+    let tmp = state.clone();
+    mnt.mount("/start", move |request: &mut Request| start_tests(request, &tmp));
+
     mnt.mount("/exit", exit_server);
     mnt.mount("/hello", send_hello);
     mnt.mount("/scenarios", send_scenarios);
     mnt.mount("/scenario", select_scenario);
     mnt.mount("/jig", get_jig);
     mnt.mount("/tests", get_tests);
-    mnt.mount("/start", start_tests);
     mnt.mount("/abort", abort_tests);
 
     thread::spawn(move || stdin_monitor(state.clone()));
