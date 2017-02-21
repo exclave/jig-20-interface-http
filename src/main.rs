@@ -4,18 +4,22 @@ extern crate serde_json;
 extern crate iron;
 extern crate staticfile;
 extern crate mount;
+extern crate clap;
+
+use clap::{Arg, App};
 
 use iron::prelude::*;
 use iron::status;
 use iron::mime::Mime;
 use mount::Mount;
 use staticfile::Static;
-const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 use std::collections::HashMap;
+
+const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
 macro_rules! println_stderr(
     ($($arg:tt)*) => { {
@@ -349,6 +353,31 @@ fn main() {
     let mut mnt = Mount::new();
     let staticfile = Static::new("html");
 
+    let matches = App::new("Jig-20 HTTP Interface")
+                        .version("1.0")
+                        .author("Sean Cross <sean@xobs.io>")
+                        .about("Presents CFTI over a web server")
+                        .arg(Arg::with_name("ADDRESS")
+                                .short("a")
+                                .long("address")
+                                .value_name("LISTEN_ADDRESS")
+                                .help("Interface address to listen on")
+                                .default_value("0.0.0.0")
+                                .required(true)
+                        )
+                        .arg(Arg::with_name("PORT")
+                                .short("p")
+                                .long("port")
+                                .value_name("PORT_NUMBER")
+                                .help("Port to listen on")
+                                .default_value("3000")
+                                .required(true)
+                        )
+                        .get_matches();
+
+    let interface = matches.value_of("ADDRESS").unwrap();
+    let port = matches.value_of("PORT").unwrap();
+
     let state = Arc::new(Mutex::new(InterfaceState {
         server: "".to_string(),
         jig: "".to_string(),
@@ -385,5 +414,5 @@ fn main() {
     mnt.mount("/abort", abort_tests);
 
     thread::spawn(move || stdin_monitor(state.clone()));
-    Iron::new(mnt).http("localhost:3000").unwrap();
+    Iron::new(mnt).http(format!("{}:{}", interface, port).as_str()).unwrap();
 }
