@@ -25,6 +25,9 @@
             else if (r === "Running") {
                 return "Running";
             }
+            else if (r["Skipped"] !== undefined) {
+                return "Skipped: " + r["Skipped"];
+            }
             else {
                 return "Unknown";
             }
