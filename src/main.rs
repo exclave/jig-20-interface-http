@@ -219,7 +219,11 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
     let mut rest = items.clone();
     let class = rest.remove(0).to_lowercase();
     let field = rest.remove(0).to_lowercase();
-    let name = rest.remove(0);
+    let name = if rest.len() > 0 {
+        rest.remove(0)
+    } else {
+        "No Name".to_string()
+    };
     let name_lc = name.to_lowercase();
     let value = rest.join(" ");
 
