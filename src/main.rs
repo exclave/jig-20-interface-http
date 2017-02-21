@@ -41,7 +41,7 @@ enum OutgoingMessage {
 // <message-type>   <unit>    <unit-type>    <unix-time-secs>    <unix-time-nsecs>    <message>
 #[derive(Clone, Debug, Serialize)]
 struct LogMessage {
-    message_type: u32,
+    message_class: String,
     unit_id: String,
     unit_type: String,
     timestamp: time::Duration,
@@ -287,7 +287,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 }
             },
             "finish" => {
-                let result = match items.remove(0).parse() {
+                let result = match items.remove(1).parse() {
                     Ok(val) => val,
                     Err(e) => {println_stderr!("Unable to parse result: {:?}", e); 500},
                 };
@@ -318,7 +318,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 data_arc.lock().unwrap().test_results.insert(test_id, TestResult::Skipped(test_result));
             },
             "log" => {
-                let message_type: u32 = items.remove(0).parse().unwrap();
+                let message_class = items.remove(0);
                 let unit_id = items.remove(0);
                 let unit_type = items.remove(0);
                 let timestamp = time::Duration::new(items[0].parse().unwrap(),
@@ -327,7 +327,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 items.remove(0);
                 let message = items.join(" ");
                 data_arc.lock().unwrap().log.push(LogMessage {
-                    message_type: message_type,
+                    message_class: message_class,
                     unit_id: unit_id,
                     unit_type: unit_type,
                     timestamp: timestamp,

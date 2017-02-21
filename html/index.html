@@ -9,6 +9,26 @@
 </head>
 <body>
     <script>
+        function result_to_string(r) {
+            if (r === undefined) {
+                return "Undefined";
+            }
+            else if (r["Fail"] !== undefined) {
+                return "Fail: " + r["Fail"];
+            }
+            else if (r["Pass"] !== undefined) {
+                return "Pass: " + r["Pass"];
+            }
+            else if (r === "Pending") {
+                return "Pending";
+            }
+            else if (r === "Running") {
+                return "Running";
+            }
+            else {
+                return "Unknown";
+            }
+        }
         function updateStuff(result) {
             $("#serverid").html(result.server);
 
@@ -38,7 +58,7 @@
                             .append($('<td>').text(e))
                             .append($('<td>').text(result.test_names[e]))
                             .append($('<td>').text(result.test_descriptions[e]))
-                            .append($('<td>').text(result.test_results[e]))
+                            .append($('<td>').text(result_to_string(result.test_results[e])))
                     );
                 });
             }
@@ -50,7 +70,7 @@
                 d.setMilliseconds(e.timestamp.nanos / 1000000);
                 $("#logs").find('tbody')
                     .append($('<tr>')
-                        .append($('<td>').text(e.message_type))
+                        .append($('<td>').text(e.message_class))
                         .append($('<td>').text(e.unit_type))
                         .append($('<td>').text(e.unit_id))
                         .append($('<td>').text(d))
@@ -123,7 +143,7 @@
     <table id="logs">
         <thead>
             <tr>
-                <th>Type</th>
+                <th>Class</th>
                 <th>Unit Type</th>
                 <th>Unit ID</th>
                 <th>Timestamp</th>
