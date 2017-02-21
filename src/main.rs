@@ -257,10 +257,10 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
 
         match verb.as_str() {
             "hello" => data_arc.lock().unwrap().server = items.join(" "),
-            "jig" => data_arc.lock().unwrap().jig = items[0].clone(),
+            "jig" => data_arc.lock().unwrap().jig = items.get(0).unwrap_or(&"No Jig".to_string()).clone(),
             "scenarios" => data_arc.lock().unwrap().scenarios = items.clone(),
             "scenario" => {
-                data_arc.lock().unwrap().scenario = items[0].clone();
+                data_arc.lock().unwrap().scenario = items.get(0).unwrap_or(&"No Scenario".to_string()).clone();
                 data_arc.lock().unwrap().scenario_state = ScenarioState::Pending;
             },
             "tests" => {
@@ -274,7 +274,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 }
             },
             "describe" => stdin_describe(&data_arc, items),
-            "ping" => cfti_send(OutgoingMessage::Pong(items[0].clone())),
+            "ping" => cfti_send(OutgoingMessage::Pong(items.get(0).unwrap_or(&"".to_string()).clone())),
             "start" => {
                 let scenario_name = items.remove(0);
                 data_arc.lock().unwrap().scenario_state = ScenarioState::Running;
