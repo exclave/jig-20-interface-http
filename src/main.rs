@@ -3,6 +3,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate iron;
 extern crate staticfile;
+extern crate urlencoded;
 extern crate mount;
 extern crate clap;
 
@@ -126,9 +127,6 @@ pub struct InterfaceState {
 
     /// Map of test results, usually will default to "Pending".
     test_results: HashMap<String, TestResult>,
-
-    /// List of log entries, returned by LOG
-    log: Vec<LogMessage>,
 }
 
 fn cfti_send(msg: OutgoingMessage) {
@@ -155,6 +153,35 @@ fn show_status_json(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> Iron
 
     let content_type = "application/json".parse::<Mime>().unwrap();
     Ok(Response::with((content_type, status::Ok, serde_json::to_string(state).unwrap())))
+}
+
+fn show_logs_json(request: &mut Request, logs: &Arc<Mutex<Vec<LogMessage>>>) -> IronResult<Response> {
+    let query = match request.get_ref::<urlencoded::UrlEncodedQuery>() {
+        Ok(hashmap) => hashmap.clone(),
+        Err(_) => HashMap::new(),
+    };
+
+    let ref logs = *logs.lock().unwrap();
+
+    let start = match query.get("start") {
+        Some(s) => match s[0].parse() {
+            Ok(o) => o,
+            Err(e) => return Ok(Response::with((status::BadRequest, format!("Unable to parse start value: {:?} / {}", s, e).to_string()))),
+        },
+        None => 0,
+    };
+
+    let end = match query.get("end") {
+        Some(s) => match s[0].parse() {
+            Ok(o) => o,
+            Err(e) => return Ok(Response::with((status::BadRequest, format!("Unable to parse end value: {:?} / {}", s, e).to_string()))),
+        },
+        None => logs.len(),
+    };
+
+    let content_type = "application/json".parse::<Mime>().unwrap();
+
+    Ok(Response::with((content_type, status::Ok, serde_json::to_string(&logs[start..end]).unwrap())))
 }
 
 fn exit_server(_: &mut Request) -> IronResult<Response> {
@@ -231,7 +258,6 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
     let name_lc = name.to_lowercase();
     let value = rest.join(" ");
 
-
     match class.as_str() {
         "test" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().test_names.insert(name_lc, value);},
@@ -252,7 +278,7 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
     };
 }
 
-fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
+fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMessage>>>) {
     let rx = io::stdin();
     loop {
         let mut line = String::new();
@@ -334,7 +360,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>) {
                 items.remove(0);
                 items.remove(0);
                 let message = items.join(" ");
-                data_arc.lock().unwrap().log.push(LogMessage {
+                logs.lock().unwrap().push(LogMessage {
                     message_class: message_class,
                     unit_id: unit_id,
                     unit_type: unit_type,
@@ -392,8 +418,9 @@ fn main() {
         test_names: HashMap::new(),
         test_descriptions: HashMap::new(),
         test_results: HashMap::new(),
-        log: vec![],
     }));
+
+    let logs = Arc::new(Mutex::new(vec![]));
 
     cfti_send(OutgoingMessage::Log("HTTP interface starting up".to_string()));
 
@@ -401,6 +428,9 @@ fn main() {
 
     let tmp = state.clone();
     mnt.mount("/current.json", move |request: &mut Request| show_status_json(request, &tmp));
+
+    let tmp = logs.clone();
+    mnt.mount("/log.json", move |request: &mut Request| show_logs_json(request, &tmp));
 
     let tmp = state.clone();
     mnt.mount("/start", move |request: &mut Request| start_tests(request, &tmp));
@@ -413,6 +443,6 @@ fn main() {
     mnt.mount("/tests", get_tests);
     mnt.mount("/abort", abort_tests);
 
-    thread::spawn(move || stdin_monitor(state.clone()));
+    thread::spawn(move || stdin_monitor(state.clone(), logs.clone()));
     Iron::new(mnt).http(format!("{}:{}", interface, port).as_str()).unwrap();
 }
