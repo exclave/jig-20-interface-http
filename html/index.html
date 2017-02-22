@@ -9,6 +9,8 @@
 </head>
 <body>
     <script>
+        var logIndex = 0;
+
         function result_to_string(r) {
             if (r === undefined) {
                 return "Undefined";
@@ -32,6 +34,7 @@
                 return "Unknown";
             }
         }
+
         function updateStuff(result) {
             $("#serverid").html(result.server);
 
@@ -65,28 +68,36 @@
                     );
                 });
             }
+        }
 
-            $("#logs").find('tbody').empty();
-            result.log.forEach(function(e) {
+        function updateLogs(result) {
+            var logNode = $("#logs").find('tbody');
+            result.forEach(function(e) {
                 d = new Date(0);
                 d.setUTCSeconds(e.timestamp.secs);
                 d.setMilliseconds(e.timestamp.nanos / 1000000);
-                $("#logs").find('tbody')
-                    .append($('<tr>')
+                logNode
+                    .prepend($('<tr>')
                         .append($('<td>').text(e.message_class))
                         .append($('<td>').text(e.unit_type))
                         .append($('<td>').text(e.unit_id))
                         .append($('<td>').text(d))
                         .append($('<td>').text(e.message))
                     );
+
+                // When the next log request is made, don't include the recently-appended node.
+                logIndex++;
             });
         }
+
         function queueUpdate(timeout) {
             window.setTimeout(function() { fireUpdate(); }, timeout);
         }
+
         function fireUpdate() {
             queueUpdate(500);
             $.ajax({url: "/current.json", success: updateStuff});
+            $.ajax({url: "/log.json?start=" + logIndex, success: updateLogs});
         }
         function changeScenario(e) {
             var new_scenario_id = $('#scenarioselect').val();
