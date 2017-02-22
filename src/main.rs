@@ -156,6 +156,7 @@ fn show_status_json(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> Iron
 }
 
 fn show_logs_json(request: &mut Request, logs: &Arc<Mutex<Vec<LogMessage>>>) -> IronResult<Response> {
+    let content_type = "application/json".parse::<Mime>().unwrap();
     let query = match request.get_ref::<urlencoded::UrlEncodedQuery>() {
         Ok(hashmap) => hashmap.clone(),
         Err(_) => HashMap::new(),
@@ -165,7 +166,10 @@ fn show_logs_json(request: &mut Request, logs: &Arc<Mutex<Vec<LogMessage>>>) -> 
 
     let start = match query.get("start") {
         Some(s) => match s[0].parse() {
-            Ok(o) => o,
+            Ok(o) => match o {
+                o if o >= logs.len() => return Ok(Response::with((content_type, status::Ok, "[]".to_string()))),
+                o => o,
+            },
             Err(e) => return Ok(Response::with((status::BadRequest, format!("Unable to parse start value: {:?} / {}", s, e).to_string()))),
         },
         None => 0,
@@ -173,13 +177,14 @@ fn show_logs_json(request: &mut Request, logs: &Arc<Mutex<Vec<LogMessage>>>) -> 
 
     let end = match query.get("end") {
         Some(s) => match s[0].parse() {
-            Ok(o) => o,
+            Ok(o) => match o {
+                o if o >= logs.len() => logs.len() - 1,
+                o => o,
+            },
             Err(e) => return Ok(Response::with((status::BadRequest, format!("Unable to parse end value: {:?} / {}", s, e).to_string()))),
         },
         None => logs.len(),
     };
-
-    let content_type = "application/json".parse::<Mime>().unwrap();
 
     Ok(Response::with((content_type, status::Ok, serde_json::to_string(&logs[start..end]).unwrap())))
 }
