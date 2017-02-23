@@ -376,7 +376,6 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
             "exit" => std::process::exit(0),
             other => println_stderr!("Unrecognized command: {}", other),
         }
-        thread::sleep(time::Duration::from_millis(100));
     }
 }
 
