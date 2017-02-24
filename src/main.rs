@@ -129,19 +129,27 @@ pub struct InterfaceState {
     test_results: HashMap<String, TestResult>,
 }
 
+fn cfti_escape(msg: String) -> String {
+    msg.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
+}
+
+fn cfti_unescape(msg: String) -> String {
+    msg.replace("\\t", "\t").replace("\\n", "\n").replace("\\r", "\r").replace("\\\\", "\\")
+}
+
 fn cfti_send(msg: OutgoingMessage) {
     let tx = io::stdout();
     let result = match msg {
-        OutgoingMessage::Hello(s) => writeln!(tx.lock(), "HELLO {}", s),
+        OutgoingMessage::Hello(s) => writeln!(tx.lock(), "HELLO {}", cfti_escape(s)),
         OutgoingMessage::GetJig => writeln!(tx.lock(), "JIG"),
         OutgoingMessage::Scenarios => writeln!(tx.lock(), "SCENARIOS"),
-        OutgoingMessage::Scenario(s) => writeln!(tx.lock(), "SCENARIO {}", s),
+        OutgoingMessage::Scenario(s) => writeln!(tx.lock(), "SCENARIO {}", cfti_escape(s)),
         OutgoingMessage::GetTests => writeln!(tx.lock(), "TESTS"),
-        OutgoingMessage::StartTests(s) => writeln!(tx.lock(), "START {}", s),
+        OutgoingMessage::StartTests(s) => writeln!(tx.lock(), "START {}", cfti_escape(s)),
         OutgoingMessage::AbortTests => writeln!(tx.lock(), "ABORT"),
-        OutgoingMessage::Log(s) => writeln!(tx.lock(), "LOG {}", s),
-        OutgoingMessage::Pong(s) => writeln!(tx.lock(), "PONG {}", s),
-        OutgoingMessage::Shutdown(s) => writeln!(tx.lock(), "SHUTDOWN {}", s),
+        OutgoingMessage::Log(s) => writeln!(tx.lock(), "LOG {}", cfti_escape(s)),
+        OutgoingMessage::Pong(s) => writeln!(tx.lock(), "PONG {}", cfti_escape(s)),
+        OutgoingMessage::Shutdown(s) => writeln!(tx.lock(), "SHUTDOWN {}", cfti_escape(s)),
     };
     if result.is_err() {
         println!("Unable to write outgoing message: {}", result.unwrap_err());
@@ -288,9 +296,10 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
     loop {
         let mut line = String::new();
         rx.read_line(&mut line).ok().expect("Unable to read line");
+        let line = cfti_unescape(line);
 
         let mut items: Vec<String> = line.split_whitespace().map(|x| x.to_string()).collect();
-        println_stderr!("Got command: {:?}", items);
+        //println_stderr!("Got command: {:?}", items);
         let verb = items[0].to_lowercase();
         items.remove(0);
 
