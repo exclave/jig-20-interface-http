@@ -1,24 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
 <head>
-    <script
-            src="/js/jquery-3.1.1.js"
-            crossorigin="anonymous"></script>
     <meta charset="utf-8">
-    <style class="text/css">
-        table {
-            border: 1px solid;
-            padding: 2px;
-        }
-        td {
-            border: 1px solid;
-            padding: 2px;
-        }
-    </style>
+    <title>Jig//20</title>
+
+    <link rel="stylesheet" type="text/css" href="/css/demo.css">
+    <link rel="stylesheet" type="text/css" href="/js/jquery.gridster.min.css">
+    <script src="/js/jquery-3.1.1.js"
+            crossorigin="anonymous"></script>
+    <script src="/js/jquery.gridster.min.js"
+            type="text/javascript"
+            charset="utf-8"></script>
+
+    <script type="text/javascript">
+        var gridster = null;
+        $(document).ready(function () {
+            gridster = $(".gridster ul").gridster({
+                widget_base_dimensions: ['auto', 200],
+                autogenerate_stylesheet: true,
+                min_cols: 1,
+                max_cols: 5,
+                widget_margins: [5, 5],
+                resize: {
+                    enabled: true
+                }
+            }).data('gridster');
+            $('.gridster  ul').css({'padding': '0'});
+        });
+    </script>
 </head>
 <body>
     <script>
         var logIndex = 0;
+        var selectedScenario;
 
         function result_to_string(r) {
             if (r === undefined) {
@@ -56,18 +69,15 @@
             $("#scenariodescription").html(result.scenario_descriptions[result.scenario]);
             $("#scenariostate").html(result.scenario_state);
 
-            var scenario_id = $('#scenarioselect').val() || result.scenario;
+            var selectedScenario = selectedScenario || result.scenario;
             $("#scenarioselect").empty();
             result.scenarios.forEach(function(e) {
-                $("#scenarioselect").append($('<option>', {
-                    value: e,
-                    selected: e === scenario_id
-                }).text(result.scenario_names[e]));
+                $("#scenarioselect").append($('<div>').text(result.scenario_names[e]).click(function(event) { changeScenario(e); }));
             });
 
             $('#tests').find('tbody').empty();
-            if (result.tests[scenario_id] !== undefined) {
-                result.tests[scenario_id].forEach(function(e) {
+            if (result.tests[selectedScenario] !== undefined) {
+                result.tests[selectedScenario].forEach(function(e) {
                     $('#tests').find('tbody')
                         .append($('<tr>')
                             .append($('<td>').text(e))
@@ -79,18 +89,28 @@
             }
         }
 
+        function pad(n, width, z) {
+            z = z || '0';
+            n = n + '';
+            return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+        }
+
         function updateLogs(result) {
             var logNode = $("#logs").find('tbody');
             result.forEach(function(e) {
-                d = new Date(0);
+                var d = new Date(0);
                 d.setUTCSeconds(e.timestamp.secs);
                 d.setMilliseconds(e.timestamp.nanos / 1000000);
+                var timeText = d.getHours() + ":"
+                             + pad(d.getMinutes(), 2) + ":"
+                             + pad(d.getSeconds(), 2) + "."
+                             + pad(d.getMilliseconds(), 3);
                 logNode
                     .prepend($('<tr>')
                         .append($('<td>').text(e.message_class))
                         .append($('<td>').text(e.unit_type))
                         .append($('<td>').text(e.unit_id))
-                        .append($('<td>').text(d))
+                        .append($('<td>').text(timeText))
                         .append($('<td>').text(e.message))
                     );
 
@@ -108,14 +128,13 @@
             $.ajax({url: "/current.json", success: updateStuff});
             $.ajax({url: "/log.json?start=" + logIndex, success: updateLogs});
         }
-        function changeScenario(e) {
-            var new_scenario_id = $('#scenarioselect').val();
+
+        function changeScenario(new_scenario_id) {
             $.ajax({url: "/scenario?" + new_scenario_id, success: function(){}});
             return true;
         }
 
         $(document).ready(function() {
-            $('#scenarioselect').on("change", changeScenario);
             $('#exit-button').on('click', function() {
                 $.ajax({
                     url: "/exit",
@@ -128,54 +147,100 @@
                     success: function(){}
                 });
             });
+            var boxes = $('li > .gridster-box');
+            boxes.each(function(i, box) {
+                var title = box.getAttribute('data-title');
+                if (title === undefined)
+                    return;
+                $(box).prepend($('<h1>').text(title));
+            });
             fireUpdate();
         })
     </script>
-    <div><input type="submit" id="exit-button" value="Quit Server"></div>
-    <div>Server ID: <span id="serverid"></span></div>
-    <section id="jigsection">
-        <div>Jig: <span id="jigid"></span></div>
-        <div>Jig name: <span id="jigname"></span></div>
-        <div>Jig description: <span id="jigdescription"></span></div>
-    </section>
-    <section id="scenariosection">
-        <div>Scenario: <span id="scenarioid"></span></div>
-        <div>Scenario name: <span id="scenarioname"></span></div>
-        <div>Scenario description: <span id="scenariodescription"></span></div>
-        <div>Scenario state: <span id="scenariostate"></span></div>
-    </section>
-    <section id="scenariolist"><label for="scenarioselect">Available Scenarios</label>
-        <select name="scenarioselect" id="scenarioselect" size="5">
-        </select>
-    </section>
-    <table id="tests">
-        <thead>
-            <tr>
-                <th>Test ID</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Result</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-            </tr>
-        </tbody>
-    </table>
-    <div><input type="submit" id="startstop-button" value="Start Tests"></div>
-    <table id="logs">
-        <thead>
-            <tr>
-                <th>Class</th>
-                <th>Unit Type</th>
-                <th>Unit ID</th>
-                <th>Timestamp</th>
-                <th>Message</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr></tr>
-        </tbody>
-    </table>
+    
+    <div class="content">
+    <h1>Jig Dashboard</h1>
+    <p>Things work.  Neato.</p>
+</div>
+<div class="gridster">
+    <ul>
+        <li data-sizey="1" data-sizex="1" data-col="4" data-row="1">
+            <div class="gridster-box" data-tile="Foobar" data-view="Text" data-title="Scenarios">
+                <section id="scenariolist">
+                    <div name="scenarioselect" id="scenarioselect">
+                    </div>
+                </section>
+            </div>
+        </li>
+        <li data-sizey="1" data-sizex="1" data-col="5" data-row="2">
+            <div class="gridster-box" data-title="Current Scenario">
+                <section id="scenariosection">
+                    <!--div>Scenario: <span id="scenarioid"></span></div-->
+                    <div id="scenarioname"></div>
+                    <div id="scenariodescription"></div>
+                </section>
+            </div>
+        </li>
+        <li data-sizey="1" data-sizex="1" data-col="2" data-row="3">
+            <div class="gridster-box" data-title="Jig">
+                <section id="jigsection">
+                    <!--div>Jig: <span id="jigid"></span></div-->
+                    <div id="jigname"></div>
+                    <div id="jigdescription"></div>
+                </section>
+            </div>
+        </li>
+        <li data-sizey="1" data-sizex="4" data-col="1" data-row="1">
+            <div class="gridster-box">
+                <table id="tests">
+                    <thead>
+                        <tr>
+                            <th>Test ID</th>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </li>
+        <li data-sizey="1" data-sizex="4" data-col="3" data-row="1">
+            <div class="gridster-box">
+                <table id="logs">
+                    <thead>
+                        <tr>
+                            <th>Class</th>
+                            <th>Unit Type</th>
+                            <th>Unit ID</th>
+                            <th>Timestamp</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr></tr>
+                    </tbody>
+                </table>
+            </div>
+        </li>
+        <li data-sizey="1" data-sizex="1" data-col="3" data-row="3">
+            <div class="gridster-box" data-title="Status">
+                <input type="submit" id="startstop-button" value="Start Tests">
+                <div id="scenariostate"></div>
+            </div>
+        </li>
+        <li data-sizey="1" data-sizex="1" data-col="1" data-row="3">
+            <div class="gridster-box">
+                <div>Server ID: <span id="serverid"></span></div>
+                <div><input type="submit" id="exit-button" value="Quit Server"></div>
+            </div>
+        </li>
+    </ul>
+</div>
+
+
 </body>
 </html>
