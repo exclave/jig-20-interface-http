@@ -32,6 +32,7 @@
     <script>
         var logIndex = 0;
         var selectedScenario;
+		var scenarioState;
 
         function result_to_string(r) {
             if (r === undefined) {
@@ -68,6 +69,14 @@
             $("#scenarioname").html(result.scenario_names[result.scenario]);
             $("#scenariodescription").html(result.scenario_descriptions[result.scenario]);
             $("#scenariostate").html(result.scenario_state);
+			scenarioState = result.scenario_state;
+
+			if (scenarioState == "Running") {
+				document.getElementById("startstop-button").value = "Stop Tests";
+			}
+			else {
+				document.getElementById("startstop-button").value = "Start Tests";
+			}
 
             var selectedScenario = selectedScenario || result.scenario;
             $("#scenarioselect").empty();
@@ -142,8 +151,12 @@
                 });
             });
             $('#startstop-button').on('click', function() {
+				url = "/start";
+				if (scenarioState == "Running") {
+					url = "/abort";
+				}
                 $.ajax({
-                    url: "/start",
+                    url: url,
                     success: function(){}
                 });
             });
