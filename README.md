@@ -3,6 +3,8 @@ Jig-20 HTTP Interface
 
 A web-based interface for the Jig-20 framework.
 
+This version has been modified specifically for the NeTV2 test scenario.
+
 
 Running
 -------
