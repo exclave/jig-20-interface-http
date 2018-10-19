@@ -36,7 +36,7 @@ For testing purposes, you can simply run the program directly.  However, this is
 
 To use with exclave, create `webserver.interface` in your exclave tests directory:
 
-````
+````ini
 [Interface]
 Name=Web Server
 Description=Runs a web server on port 3000
