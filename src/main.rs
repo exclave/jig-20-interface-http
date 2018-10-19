@@ -128,7 +128,8 @@ pub struct InterfaceState {
     current_log: Vec<LogMessage>,
 
     /// Logs from the previous run (i.e. since "START" was received, until "STOP" was received)
-    last_log: Vec<LogMessage>,}
+    previous_log: Vec<LogMessage>,
+}
 
 fn cfti_escape(msg: String) -> String {
     msg.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
@@ -250,6 +251,41 @@ fn show_current_logs_json(request: &mut Request, state: &Arc<Mutex<InterfaceStat
 
     Ok(Response::with((content_type, status::Ok, serde_json::to_string(&state.current_log[start..end]).unwrap())))
 }
+
+fn show_previous_logs_json(request: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
+    let content_type = "application/json".parse::<Mime>().unwrap();
+    let query = match request.get_ref::<urlencoded::UrlEncodedQuery>() {
+        Ok(hashmap) => hashmap.clone(),
+        Err(_) => HashMap::new(),
+    };
+
+    let ref state = *state.lock().unwrap();
+
+    let start = match query.get("start") {
+        Some(s) => match s[0].parse() {
+            Ok(o) => match o {
+                o if o >= state.previous_log.len() => return Ok(Response::with((content_type, status::Ok, "[]".to_string()))),
+                o => o,
+            },
+            Err(e) => return Ok(Response::with((status::BadRequest, format!("Unable to parse start value: {:?} / {}", s, e).to_string()))),
+        },
+        None => 0,
+    };
+
+    let end = match query.get("end") {
+        Some(s) => match s[0].parse() {
+            Ok(o) => match o {
+                o if o >= state.previous_log.len() => state.previous_log.len() - 1,
+                o => o,
+            },
+            Err(e) => return Ok(Response::with((status::BadRequest, format!("Unable to parse end value: {:?} / {}", s, e).to_string()))),
+        },
+        None => state.previous_log.len(),
+    };
+
+    Ok(Response::with((content_type, status::Ok, serde_json::to_string(&state.previous_log[start..end]).unwrap())))
+}
+
 fn truncate_logs(_request: &mut Request, state: &Arc<Mutex<Vec<LogMessage>>>) -> IronResult<Response> {
     let content_type = "application/json".parse::<Mime>().unwrap();
     let ref mut logs = *state.lock().unwrap();
@@ -396,10 +432,10 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
                     data.test_results.insert(test_name.clone(), TestResult::Pending);
                 }
 
-                // Move "current_log" to "last_log", and truncate "current_log"
-                data.last_log.clear();
+                // Move "current_log" to "previous_log", and truncate "current_log"
+                data.previous_log.clear();
                 for element in data.current_log.drain(..) {
-                    data.last_log.push(element);
+                    data.previous_log.push(element);
                 }
             },
             "finish" => {
@@ -510,7 +546,7 @@ fn main() {
         test_results: HashMap::new(),
         stdin_log: vec![],
         current_log: vec![],
-        last_log: vec![],
+        previous_log: vec![],
     }));
 
     let logs = Arc::new(Mutex::new(vec![]));
@@ -527,6 +563,9 @@ fn main() {
 
     let tmp_state = state.clone();
     mnt.mount("/current.json", move |request: &mut Request| show_current_logs_json(request, &tmp_state));
+
+    let tmp_state = state.clone();
+    mnt.mount("/previous.json", move |request: &mut Request| show_previous_logs_json(request, &tmp_state));
 
     let tmp_state = state.clone();
     mnt.mount("/start", move |request: &mut Request| start_tests(request, &tmp_state));
