@@ -22,13 +22,6 @@ use std::collections::HashMap;
 
 const SERVER_SIGNATURE: &'static str = "CFTI HTTP 1.0";
 
-macro_rules! println_stderr(
-    ($($arg:tt)*) => { {
-        let r = writeln!(&mut ::std::io::stderr(), $($arg)*);
-        r.expect("failed printing to stderr");
-    } }
-);
-
 #[derive(Clone, Debug)]
 enum OutgoingMessage {
     Hello(String),
@@ -298,19 +291,19 @@ fn stdin_describe(data_arc: &Arc<Mutex<InterfaceState>>, items: Vec<String>) {
         "test" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().test_names.insert(name_lc, value);},
             "description" => {data_arc.lock().unwrap().test_descriptions.insert(name_lc, value);},
-            f => println_stderr!("Unrecognized field: {}", f),
+            f => eprintln!("Unrecognized field: {}", f),
         },
         "scenario" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().scenario_names.insert(name_lc, value);},
             "description" => {data_arc.lock().unwrap().scenario_descriptions.insert(name_lc, value);},
-            f => println_stderr!("Unrecognized field: {}", f),
+            f => eprintln!("Unrecognized field: {}", f),
         },
         "jig" => match field.as_str() {
             "name" => {data_arc.lock().unwrap().jig_name = value;},
             "description" => {data_arc.lock().unwrap().jig_description = value;},
-            f => println_stderr!("Unrecognized field: {}", f),
+            f => eprintln!("Unrecognized field: {}", f),
         },
-        c => println_stderr!("Unrecognized class: {}", c),
+        c => eprintln!("Unrecognized class: {}", c),
     };
 }
 
@@ -323,7 +316,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
         let line = cfti_unescape(line);
 
         let mut items: Vec<String> = line.split_whitespace().map(|x| x.to_string()).collect();
-        //println_stderr!("Got command: {:?}", items);
+        //eprintln!("Got command: {:?}", items);
         let verb = items[0].to_lowercase();
         items.remove(0);
 
@@ -361,7 +354,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
             "finish" => {
                 let result = match items.remove(1).parse() {
                     Ok(val) => val,
-                    Err(e) => {println_stderr!("Unable to parse result: {:?}", e); 500},
+                    Err(e) => {eprintln!("Unable to parse result: {:?}", e); 500},
                 };
 
                 data_arc.lock().unwrap().scenario_state = match result {
@@ -407,7 +400,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
                 });
             },
             "exit" => std::process::exit(0),
-            other => println_stderr!("Unrecognized command: {}", other),
+            other => eprintln!("Unrecognized command: {}", other),
         }
     }
 }
