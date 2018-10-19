@@ -127,6 +127,9 @@ pub struct InterfaceState {
 
     /// Map of test results, usually will default to "Pending".
     test_results: HashMap<String, TestResult>,
+
+    /// Incoming messages (for debugging)
+    stdin_log: Vec<String>,
 }
 
 fn cfti_escape(msg: String) -> String {
@@ -174,6 +177,14 @@ fn show_status_json(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> Iron
     let content_type = "application/json".parse::<Mime>().unwrap();
     Ok(Response::with((content_type, status::Ok, serde_json::to_string(state).unwrap())))
 }
+
+fn show_stdin(_: &mut Request, state: &Arc<Mutex<InterfaceState>>) -> IronResult<Response> {
+    let ref state = *state.lock().unwrap();
+
+    let content_type = "text/plain".parse::<Mime>().unwrap();
+    Ok(Response::with((content_type, status::Ok, state.stdin_log.join("\n"))))
+}
+
 
 fn show_logs_json(request: &mut Request, logs: &Arc<Mutex<Vec<LogMessage>>>) -> IronResult<Response> {
     let content_type = "application/json".parse::<Mime>().unwrap();
@@ -308,6 +319,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
     loop {
         let mut line = String::new();
         rx.read_line(&mut line).ok().expect("Unable to read line");
+        data_arc.lock().unwrap().stdin_log.push(line.clone());
         let line = cfti_unescape(line);
 
         let mut items: Vec<String> = line.split_whitespace().map(|x| x.to_string()).collect();
@@ -443,6 +455,7 @@ fn main() {
         test_names: HashMap::new(),
         test_descriptions: HashMap::new(),
         test_results: HashMap::new(),
+        stdin_log: vec![],
     }));
 
     let logs = Arc::new(Mutex::new(vec![]));
@@ -453,6 +466,9 @@ fn main() {
 
     let tmp = state.clone();
     mnt.mount("/current.json", move |request: &mut Request| show_status_json(request, &tmp));
+
+    let tmp = state.clone();
+    mnt.mount("/stdin.txt", move |request: &mut Request| show_stdin(request, &tmp));
 
     let tmp = logs.clone();
     mnt.mount("/log.json", move |request: &mut Request| show_logs_json(request, &tmp));
