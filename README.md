@@ -1,9 +1,9 @@
 # Jig-20 HTTP Interface
+This version has been modified specifically for the NeTV2 test scenario.
 
 A web-based interface for the Jig-20 framework.
 
 ## Usage
-
 Build the program using cargo by running `cargo build --release`.
 
 Run the program by starting target/release/jig-20-interface-http.  You can specify a port with `--port`, and it defaults to port 3000.
