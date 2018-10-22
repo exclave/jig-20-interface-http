@@ -18,9 +18,7 @@
 </head>
 <body>
     <script>
-      var logIndex = 0;
-      var lastTestIndex = 0;
-      var lastScenarioState = "";
+        var logIndex = 0;
 
         function result_to_string(r) {
             if (r === undefined) {
@@ -57,13 +55,6 @@
             $("#scenarioname").html(result.scenario_names[result.scenario]);
             $("#scenariodescription").html(result.scenario_descriptions[result.scenario]);
             $("#scenariostate").html(result.scenario_state);
-	    
-	    // clear the status field
-	    if( result.scenario_state == "Running" && lastScenarioState != "Running" ) {
-		lastTestIndex = logIndex;
-		$("#status").find('tbody').empty();
-	    }
-	    lastScenarioState = result.scenario_state;
 
             var scenario_id = $('#scenarioselect').val() || result.scenario;
             $("#scenarioselect").empty();
@@ -88,57 +79,7 @@
             }
         }
 
-      function updateStatus(result) {
-	  var statusNode = $("#status").find('tbody');
-	  var correct = 1;
-	  var devicedna;
-	  statusNode.empty(); // it's a full clean reparse every update...
-          result.forEach(function(e) {
-              d = new Date(0);
-              d.setUTCSeconds(e.timestamp.secs);
-              d.setMilliseconds(e.timestamp.nanos / 1000000);
-		
-	      var msg;
-	      if( e.message[0] == '{' ) {
-		  try {
-		      msg = JSON.parse( e.message );
-		  } catch(err) {
-		      if( err == SyntaxError ) {
-			  bar = 1;
-		      }
-		  }
-		  
-		  if( msg.hasOwnProperty('start_time') ) {
-		      // populate the jig ID fields and remember the DNA, always check on future records
-		      $("#testerid_model").html(msg.model);
-		      $("#testerid_rev").html(msg.rev);
-		      $("#testerid_dna").html( parseInt(msg.dna).toString(16) );
-		      $("#testerid_software").html( msg.tester_rev );
-		      devicedna = parseInt(msg.dna);
-		      $("#status_correctness").html( "No issues yet." );
-		      lastTestIndex = logIndex;
-		  } else {
-		      if( msg.hasOwnProperty('subtest') ) {
-			  if( parseInt(msg.dna) == devicedna ) {
-			      statusNode
-				  .append($('<tr>')
-					  .append($('<td>').text(msg.subtest))
-					  .append($('<td>').text("placeholder"))
-					  .append($('<td>').text(JSON.stringify(msg.msg)))
-					  .append($('<td>').text(d.toISOString()))
-					 );
-			  } else {
-			      $("#status_correctness").html( "Inconsistent device DNA in logs " + msg.dna + " " + devicedna );
-			      correct = 0;
-			  }
-		      }
-		  }
-		  
-	      }
-          });
-      }
-
-      function updateLogs(result) {
+        function updateLogs(result) {
             var logNode = $("#logs").find('tbody');
             result.forEach(function(e) {
                 d = new Date(0);
@@ -152,6 +93,7 @@
                         .append($('<td>').text(d))
                         .append($('<td>').text(e.message))
                     );
+
                 // When the next log request is made, don't include the recently-appended node.
                 logIndex++;
             });
@@ -164,7 +106,6 @@
         function fireUpdate() {
             queueUpdate(500);
             $.ajax({url: "/current.json", success: updateStuff});
-            $.ajax({url: "/log.json?start=" + lastTestIndex, success: updateStatus});
             $.ajax({url: "/log.json?start=" + logIndex, success: updateLogs});
         }
         function changeScenario(e) {
@@ -190,30 +131,23 @@
             fireUpdate();
         })
     </script>
+    <div><input type="submit" id="exit-button" value="Quit Server"></div>
     <div>Server ID: <span id="serverid"></span></div>
-    <div><input type="submit" id="startstop-button" value="Start Tests"></div>
-    <hr>
-    <section id="testeridsection">
-        <div>Model: <span id="testerid_model"></span></div>
-        <div>Rev: <span id="testerid_rev"></span></div>
-        <div>DNA: <span id="testerid_dna"></span></div>
-        <div>Tester software rev: <span id="testerid_software"></span></div>
+    <section id="jigsection">
+        <div>Jig: <span id="jigid"></span></div>
+        <div>Jig name: <span id="jigname"></span></div>
+        <div>Jig description: <span id="jigdescription"></span></div>
     </section>
-    <table id="status">
-        <div>Test program correctness flag: <span id="status_correctness"></span></div>
-        <thead>
-            <tr>
-                <th>Subtest</th>
-                <th>Status</th>
-                <th>Message</th>
-                <th>Timestamp</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr></tr>
-        </tbody>
-    </table>
-    <hr>
+    <section id="scenariosection">
+        <div>Scenario: <span id="scenarioid"></span></div>
+        <div>Scenario name: <span id="scenarioname"></span></div>
+        <div>Scenario description: <span id="scenariodescription"></span></div>
+        <div>Scenario state: <span id="scenariostate"></span></div>
+    </section>
+    <section id="scenariolist"><label for="scenarioselect">Available Scenarios</label>
+        <select name="scenarioselect" id="scenarioselect" size="5">
+        </select>
+    </section>
     <table id="tests">
         <thead>
             <tr>
@@ -228,26 +162,7 @@
             </tr>
         </tbody>
     </table>
-    <hr>
-    <section id="scenariosection">
-        <div>Scenario: <span id="scenarioid"></span></div>
-        <div>Scenario name: <span id="scenarioname"></span></div>
-        <div>Scenario description: <span id="scenariodescription"></span></div>
-        <div>Scenario state: <span id="scenariostate"></span></div>
-    </section>
-    <hr>
-    <section id="jigsection">
-        <div>Jig: <span id="jigid"></span></div>
-        <div>Jig name: <span id="jigname"></span></div>
-        <div>Jig description: <span id="jigdescription"></span></div>
-    </section>
-    <hr>
-    <section id="scenariolist"><label for="scenarioselect">Available Scenarios</label>
-        <select name="scenarioselect" id="scenarioselect" size="5">
-        </select>
-    </section>
-    <div><input type="submit" id="exit-button" value="Quit Server"></div>
-    <hr>
+    <div><input type="submit" id="startstop-button" value="Start Tests"></div>
     <table id="logs">
         <thead>
             <tr>
