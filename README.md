@@ -3,7 +3,6 @@ This version has been modified specifically for the NeTV2 test scenario.
 
 A web-based interface for the Jig-20 framework.
 
-<<<<<<< HEAD
 ## Usage
 Build the program using cargo by running `cargo build --release`.
 
@@ -30,8 +29,6 @@ Additionally, you can make requests to exclave by performing GET requests to the
 * `/jig` - Request the current jig from exclave -- the result will appear in `/current.json`
 * `/hello` - Send the "HELLO" message to exclave, to identify this server
 * `/exit` - Shut down exclave and quit this web server
-=======
->>>>>>> parent of ed0569c... note that this fork is for the NeTV2 test scenario specifically
 
 ## Running
 
