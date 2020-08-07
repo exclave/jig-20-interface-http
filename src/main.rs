@@ -452,7 +452,7 @@ fn stdin_monitor(data_arc: Arc<Mutex<InterfaceState>>, logs: Arc<Mutex<Vec<LogMe
 
                 data.scenario_state = match result {
                     // Only results of 200 to 299 are considered "pass"
-                    200 ... 299 => ScenarioState::Pass,
+                    200 ..= 299 => ScenarioState::Pass,
                     _ => ScenarioState::Fail,
                 };
             }
